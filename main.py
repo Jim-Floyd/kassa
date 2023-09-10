@@ -50,8 +50,8 @@ def make_row_keyboard(items: list[str]) -> ReplyKeyboardMarkup:
     row = [KeyboardButton(text=item) for item in items]
     return ReplyKeyboardMarkup(keyboard=[row], resize_keyboard=True)
 
-
-income_types = ['Sotuv', 'Xizmat ko`rsatish']
+income_types = []
+income_amounts = []
 
 
 @dp.message(Command("start"))
@@ -70,42 +70,70 @@ async def income_command(message: types.Message):
     [types.KeyboardButton(text="Jami_daromadlar"), types.KeyboardButton(text='Daromad_qo`shish')], [types.KeyboardButton(text='Daromad_turini_qo`shish')]
     ]
     kb_client = types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
-    await message.answer('daromading 200$', reply_markup=kb_client)
+    await message.answer('soqqa tushdimi?))', reply_markup=kb_client)
 
+#-----------------DAROMAD TURINI QO'SHISH-------------------
 
 @dp.message(F.text == "Daromad_turini_qo`shish")
 async def add_income_type(message: Message, state: FSMContext):
-    await message.answer(text='Daromadni kiriting:')
+    await message.answer(text='Daromad turini kiriting:')
     
     
     await state.set_state(Income_types.income_type)
+
 
 
 @dp.message(Income_types.income_type)
 async def type_chosen(message: Message, state: FSMContext):
     await state.update_data(chosen_type=message.text.lower())
     user_data = await state.get_data()
-    await message.answer(text=f'Siz qo`shgan tur: {user_data}')  
-    await state.update_data(chosen_income=message.text.lower()) 
+    await message.answer(text=f'Siz qo`shgan tur: {user_data["chosen_type"]}')
+    
+    income_types.append(message.text.lower())
+    await state.update_data(chosen_type=message.text.lower()) 
     await state.clear()
 
+
+#-----------------DAROMAD QO'SHISH-------------------
 
 @dp.message(F.text == "Daromad_qo`shish")
-async def add_income_type(message: Message, state: FSMContext):
-    await message.answer(text='Daromadni turini tanlang:')
+async def choose_income_type(message: Message, state: FSMContext):
+    await message.answer(
+        text="Daromad turini tanlang:",
+        reply_markup=make_row_keyboard(income_types)
+    )
     
-    
-    await state.set_state(Income_types.income_type)
+    await state.set_state(Income.income_type)
 
 
-@dp.message(Income_types.income_type)
-async def type_chosen(message: Message, state: FSMContext):
+@dp.message(Income.income_type, F.text.in_(income_types))
+async def add_income_amount(message: Message, state: FSMContext):
     await state.update_data(chosen_type=message.text.lower())
+    await message.answer(
+        text="Daromad summasini kiriting:"
+    )
+    await state.set_state(Income.income_amount)
+    income_amounts.append(message.text.lower())
+
+
+@dp.message(Income.income_amount)
+async def reply_msg(message: Message, state: FSMContext):
     user_data = await state.get_data()
-    await message.answer(text=f'Siz qo`shgan tur: {user_data}')  
-    await state.update_data(chosen_income=message.text.lower()) 
+    await message.answer(
+        text=f"Siz {message.text.lower()} summadagi {user_data['chosen_type']} turdagi daromadni qo'shdingiz."
+    )
+    # Сброс состояния и сохранённых данных у пользователя
     await state.clear()
 
+#-----------------JAMI DAROMAD-------------------
+
+@dp.message(F.text == "Jami daromad")
+async def income_list(message: Message, state: FSMContext):
+    for income_amount in income_amounts:
+        await message.answer(text={income_amount})
+
+
+#-----------------XARAJAT TURINI QO'SHISH-------------------
 
 @dp.message(Command("Xarajatlar"))
 async def cost_command(message: types.Message):
