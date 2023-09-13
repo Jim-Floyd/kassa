@@ -14,6 +14,8 @@ from aiogram.types.keyboard_button import KeyboardButton
 from aiogram.filters.command import Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
+from data_base import sqlite_db
+from aiogram.filters.callback_data import CallbackData
 
 
 
@@ -41,6 +43,8 @@ class Income(StatesGroup):
 
 
 
+
+
 def make_row_keyboard(items: list[str]) -> ReplyKeyboardMarkup:
     """
     Создаёт реплай-клавиатуру с кнопками в один ряд
@@ -50,8 +54,15 @@ def make_row_keyboard(items: list[str]) -> ReplyKeyboardMarkup:
     row = [KeyboardButton(text=item) for item in items]
     return ReplyKeyboardMarkup(keyboard=[row], resize_keyboard=True)
 
+
 income_types = []
 income_amounts = []
+
+#---------------DB ga ulanish--------------------
+async def on_startup(_):
+    await sqlite_db.sql_start()
+    print('DBga ulanmoqda')
+
 
 
 @dp.message(Command("start"))
@@ -85,22 +96,25 @@ async def add_income_type(message: Message, state: FSMContext):
 
 @dp.message(Income_types.income_type)
 async def type_chosen(message: Message, state: FSMContext):
-    await state.update_data(chosen_type=message.text.lower())
+    await state.update_data(income_type=message.text.lower())
     user_data = await state.get_data()
-    await message.answer(text=f'Siz qo`shgan tur: {user_data["chosen_type"]}')
-    
-    income_types.append(message.text.lower())
-    await state.update_data(chosen_type=message.text.lower()) 
+    await message.answer(text=f'Siz qo`shgan tur: {user_data["income_type"]}')
+    await sqlite_db.sql_add_income_type_command(state)
     await state.clear()
+ 
 
 
 #-----------------DAROMAD QO'SHISH-------------------
 
 @dp.message(F.text == "Daromad_qo`shish")
-async def choose_income_type(message: Message, state: FSMContext):
+async def add_income(message: Message, state: FSMContext):
+    user_data = await state.get_data()
+    type_list = await sqlite_db.type_read(message)
+    print(type_list)
+    print(type(type_list))
     await message.answer(
         text="Daromad turini tanlang:",
-        reply_markup=make_row_keyboard(income_types)
+        reply_markup=make_row_keyboard(type_list)
     )
     
     await state.set_state(Income.income_type)
@@ -108,7 +122,7 @@ async def choose_income_type(message: Message, state: FSMContext):
 
 @dp.message(Income.income_type, F.text.in_(income_types))
 async def add_income_amount(message: Message, state: FSMContext):
-    await state.update_data(chosen_type=message.text.lower())
+    await state.update_data(income_type=message.text.lower())
     await message.answer(
         text="Daromad summasini kiriting:"
     )
@@ -118,12 +132,17 @@ async def add_income_amount(message: Message, state: FSMContext):
 
 @dp.message(Income.income_amount)
 async def reply_msg(message: Message, state: FSMContext):
+    await state.update_data(income_amount=message.text.lower())
     user_data = await state.get_data()
     await message.answer(
-        text=f"Siz {message.text.lower()} summadagi {user_data['chosen_type']} turdagi daromadni qo'shdingiz."
+        text=f"Siz {message.text.lower()} summadagi {user_data['chosen_type']} turdagi daromadni qo'shdingiz.",
+        reply_markup=make_row_keyboard(income_types)
     )
-    # Сброс состояния и сохранённых данных у пользователя
+    await sqlite_db.sql_add_income_command(state)
     await state.clear()
+    print(state.get_data)
+    # Сброс состояния и сохранённых данных у пользователя
+    
 
 #-----------------JAMI DAROMAD-------------------
 
